@@ -164,14 +164,17 @@ class ProjectManager {
         $(selector).jstree(true).refresh(true);
     }
 
-    async generateZip() {
-        const zip = new JSZip();
-        
-        this.newStructure.forEach((content, path) => {
-            zip.file(path, content);
-        });
+async generateZip() {
+    const zip = new JSZip();
+    this.newStructure.forEach((content, path) => {
+        zip.file(path, content);
+    });
+    const zipContent = await zip.generateAsync({ type: "blob" });
+    saveAs(zipContent, "new-project.zip");
+}
 
-        const zipContent = await zip.generateAsync({ type: 'blob' });
-        saveAs(zipContent, 'reorganized-project.zip');
-    }
+
+static calculateRelativePath(from, to) {
+    if (from === to) return "./";
+    return path.startsWith("../") ? path : `./${path}`;
 }
