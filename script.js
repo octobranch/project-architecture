@@ -20,6 +20,13 @@ class ProjectManager {
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
+        const handleFile = (file) => {
+            if (file.type === 'application/zip') {
+                document.getElementById('processBtn').disabled = false;
+                this.processZip(file);
+            }
+        };
+
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
@@ -32,52 +39,60 @@ class ProjectManager {
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) this.handleFile(file);
+            handleFile(e.dataTransfer.files[0]);
         });
 
         fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) this.handleFile(file);
+            handleFile(e.target.files[0]);
         });
     }
 
     setupEventListeners() {
-        document.getElementById('processBtn').addEventListener('click', () => this.reorganizeProject());
-        document.getElementById('structureInput').addEventListener('input', () => {
-            document.getElementById('processBtn').disabled = false;
+        document.getElementById('processBtn').addEventListener('click', () => {
+            this.reorganizeProject();
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            this.generateZip();
+        });
+
+        document.getElementById('structureInput').addEventListener('input', (e) => {
+            document.getElementById('processBtn').disabled = e.target.value.trim() === '';
         });
     }
 
-    async handleFile(file) {
-        document.getElementById('processBtn').disabled = false;
-        await this.processZip(file);
-    }
-
     async processZip(file) {
-        const zip = new JSZip();
-        const content = await zip.loadAsync(file);
-        this.originalFiles.clear();
-
-        for (const [path, file] of Object.entries(content.files)) {
-            if (!file.dir) {
-                this.originalFiles.set(path, await file.async('text'));
+        try {
+            const zip = new JSZip();
+            const loadedZip = await zip.loadAsync(file);
+            
+            this.originalFiles.clear();
+            for (const [path, fileEntry] of Object.entries(loadedZip.files)) {
+                if (!fileEntry.dir) {
+                    this.originalFiles.set(path, await fileEntry.async('text'));
+                }
             }
+            
+            this.updateTreeView('#originalTree', this.originalFiles);
+        } catch (error) {
+            console.error('Error processing ZIP:', error);
         }
-
-        this.updateTreeView('#originalTree', this.originalFiles);
     }
 
     async reorganizeProject() {
-        const structureInput = document.getElementById('structureInput').value;
-        const desiredPaths = PathManager.parseStructure(structureInput);
-        
-        this.createPathMappings(desiredPaths);
-        await this.updateFileReferences();
-        this.generateNewStructure();
-        
-        this.updateTreeView('#newTree', this.newStructure);
-        document.getElementById('downloadBtn').disabled = false;
+        try {
+            const structureInput = document.getElementById('structureInput').value;
+            const desiredPaths = PathManager.parseStructure(structureInput);
+            
+            this.createPathMappings(desiredPaths);
+            await this.updateFileReferences();
+            this.generateNewStructure();
+            
+            this.updateTreeView('#newTree', this.newStructure);
+            document.getElementById('downloadBtn').disabled = false;
+        } catch (error) {
+            console.error('Reorganization error:', error);
+        }
     }
 
     createPathMappings(desiredPaths) {
@@ -99,51 +114,64 @@ class ProjectManager {
     }
 
     async updateFileReferences() {
+        this.newStructure.clear();
+        
         for (const [oldPath, newPath] of this.pathMappings) {
-            const content = this.originalFiles.get(oldPath);
-            if (content) {
-                let updatedContent = content;
-                for (const [otherOld, otherNew] of this.pathMappings) {
-                    updatedContent = ReferenceUpdater.updateContent(
-                        updatedContent, 
-                        otherOld, 
-                        otherNew, 
-                        newPath
-                    );
-                }
-                this.newStructure.set(newPath, updatedContent);
-            }
+            let content = this.originalFiles.get(oldPath);
+            
+            this.pathMappings.forEach((targetPath, sourcePath) => {
+                content = ReferenceUpdater.updateContent(
+                    content,
+                    sourcePath,
+                    targetPath,
+                    newPath
+                );
+            });
+            
+            this.newStructure.set(newPath, content);
         }
     }
 
     generateNewStructure() {
-        this.newStructure.clear();
-        this.originalFiles.forEach((content, oldPath) => {
-            const newPath = this.pathMappings.get(oldPath) || oldPath;
-            this.newStructure.set(newPath, content);
+        this.originalFiles.forEach((content, path) => {
+            if (!this.newStructure.has(path)) {
+                this.newStructure.set(path, content);
+            }
         });
     }
 
     setupTreeViews() {
-        this.initTree('#originalTree');
-        this.initTree('#newTree');
+        this.initTree('#originalTree', this.originalFiles);
+        this.initTree('#newTree', this.newStructure);
     }
 
     initTree(selector) {
         $(selector).jstree({
             core: {
                 data: (node, cb) => {
-                    const data = Array.from(node.id === '#' ? this.originalFiles.keys() : this.newStructure.keys())
+                    const data = Array.from(this[selector === '#originalTree' ? 'originalFiles' : 'newStructure'].keys())
                         .map(path => ({ id: path, text: path, parent: '#' }));
                     cb(data);
                 }
-            }
+            },
+            plugins: ['sort']
         });
     }
 
-    updateTreeView(container, data) {
-        $(container).jstree(true).settings.core.data = Array.from(data.keys())
+    updateTreeView(selector, data) {
+        $(selector).jstree(true).settings.core.data = Array.from(data.keys())
             .map(path => ({ id: path, text: path, parent: '#' }));
-        $(container).jstree(true).refresh();
+        $(selector).jstree(true).refresh(true);
+    }
+
+    async generateZip() {
+        const zip = new JSZip();
+        
+        this.newStructure.forEach((content, path) => {
+            zip.file(path, content);
+        });
+
+        const zipContent = await zip.generateAsync({ type: 'blob' });
+        saveAs(zipContent, 'reorganized-project.zip');
     }
 }
