@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Structure Wizard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.11/themes/default/style.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🧙 File Structure Wizard</h1>
+        
+        <!-- Sección de carga -->
+        <div id="dropZone" class="drop-zone">
+            <p>Arrastra tu proyecto .zip aquí o haz clic para seleccionar</p>
+            <input type="file" id="fileInput" accept=".zip">
+        </div>
+
+        <!-- Editor de estructura -->
+        <div class="editor">
+            <h2>Estructura deseada</h2>
+            <textarea id="structureInput" placeholder="Ejemplo:
+/src
+  /assets
+    /js
+    /css
+  /components
+/public
+  index.html
+README.md"></textarea>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="actions">
+            <button id="processBtn" disabled>Procesar Proyecto</button>
+            <button id="downloadBtn" disabled>Descargar .zip</button>
+        </div>
+
+        <!-- Vistas previas -->
+        <div class="previews">
+            <div class="preview-box">
+                <h3>Estructura Original</h3>
+                <div id="originalTree"></div>
+            </div>
+            <div class="preview-box">
+                <h3>Nueva Estructura</h3>
+                <div id="newTree"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.11/jstree.min.js"></script>
+    <script src="lib/path.js"></script>
+    <script src="lib/reference-updater.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
